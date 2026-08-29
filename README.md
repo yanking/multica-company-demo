@@ -18,3 +18,9 @@ npm test         # node --test
 ## 约束
 - 不引入第三方依赖；Node ≥22。
 - 变更走 PR，CI 通过后由代码评审员合并。
+
+## 预发环境（staging）
+- 托管：运行时主机本机（ip-172-31-27-66），`systemd --user` 服务 `multica-company-demo-staging`，固定检出目录 `~/apps/multica-company-demo`，端口 3100。
+- 部署最新主干：`bash deploy/staging.sh`；回滚：`bash deploy/staging.sh <commit-sha>`（幂等，可反复执行）。
+- 健康检查：`curl -fsS http://127.0.0.1:3100/api/todos`；日志：`journalctl --user -u multica-company-demo-staging -n 50`；停止：`systemctl --user stop multica-company-demo-staging`。
+- 流水线约定：S6「部署预发与发布说明」由运维发布智能体在合并后执行上面的部署命令并贴出健康检查输出；不部署生产。
