@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>待办</title>
+  <style>
+    :root { --color-primary: #2563eb; --color-text: #111827; --color-muted: #6b7280; --color-border: #e5e7eb; --space-2: 8px; --space-4: 16px; --radius: 8px; --font-size-body: 16px; }
+    body { margin: 0; padding: var(--space-4); font: var(--font-size-body)/1.5 system-ui, sans-serif; color: var(--color-text); max-width: 640px; }
+    form { display: flex; gap: var(--space-2); margin-bottom: var(--space-4); }
+    input { flex: 1; padding: var(--space-2); border: 1px solid var(--color-border); border-radius: var(--radius); }
+    button { padding: var(--space-2) var(--space-4); border: 0; border-radius: var(--radius); background: var(--color-primary); color: #fff; cursor: pointer; }
+    ul { list-style: none; padding: 0; margin: 0; }
+    li { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2) 0; border-bottom: 1px solid var(--color-border); }
+    li.done span { text-decoration: line-through; color: var(--color-muted); }
+    .empty { color: var(--color-muted); }
+  </style>
+</head>
+<body>
+  <h1>待办</h1>
+  <form id="add">
+    <input id="title" placeholder="要做什么？" required />
+    <button type="submit">添加</button>
+  </form>
+  <ul id="list"></ul>
+  <p id="empty" class="empty" hidden>还没有待办，添加一条吧。</p>
+  <script>
+    // 最小前端：拉取列表、新增、切换完成
+    const list = document.getElementById("list");
+    const empty = document.getElementById("empty");
+    async function load() {
+      const { todos } = await (await fetch("/api/todos")).json();
+      list.innerHTML = "";
+      empty.hidden = todos.length > 0;
+      for (const t of todos) {
+        const li = document.createElement("li");
+        li.className = t.done ? "done" : "";
+        const cb = document.createElement("input");
+        cb.type = "checkbox";
+        cb.checked = t.done;
+        cb.addEventListener("change", async () => {
+          await fetch(`/api/todos/${t.id}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ done: cb.checked }) });
+          load();
+        });
+        const span = document.createElement("span");
+        span.textContent = t.title;
+        li.append(cb, span);
+        list.append(li);
+      }
+    }
+    document.getElementById("add").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const input = document.getElementById("title");
+      await fetch("/api/todos", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ title: input.value }) });
+      input.value = "";
+      load();
+    });
+    load();
+  </script>
+</body>
+</html>

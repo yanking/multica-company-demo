@@ -1,0 +1,12 @@
+{
+  "name": "multica-company-demo",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "AI 软件公司流水线试点：零依赖 Node 待办应用",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test"
+  }
+}
