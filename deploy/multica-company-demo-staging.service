@@ -1,0 +1,15 @@
+# systemd 用户单元模板：由 deploy/staging.sh 渲染 __APP_DIR__/__NODE__/__PORT__ 后安装到 ~/.config/systemd/user/
+[Unit]
+Description=multica-company-demo staging（预发环境）
+After=network.target
+
+[Service]
+WorkingDirectory=__APP_DIR__
+Environment=PORT=__PORT__
+Environment=NODE_ENV=staging
+ExecStart=__NODE__ server.js
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=default.target
