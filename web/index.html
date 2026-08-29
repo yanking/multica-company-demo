@@ -5,57 +5,536 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>待办</title>
   <style>
-    :root { --color-primary: #2563eb; --color-text: #111827; --color-muted: #6b7280; --color-border: #e5e7eb; --space-2: 8px; --space-4: 16px; --radius: 8px; --font-size-body: 16px; }
-    body { margin: 0; padding: var(--space-4); font: var(--font-size-body)/1.5 system-ui, sans-serif; color: var(--color-text); max-width: 640px; }
-    form { display: flex; gap: var(--space-2); margin-bottom: var(--space-4); }
-    input { flex: 1; padding: var(--space-2); border: 1px solid var(--color-border); border-radius: var(--radius); }
-    button { padding: var(--space-2) var(--space-4); border: 0; border-radius: var(--radius); background: var(--color-primary); color: #fff; cursor: pointer; }
-    ul { list-style: none; padding: 0; margin: 0; }
-    li { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2) 0; border-bottom: 1px solid var(--color-border); }
-    li.done span { text-decoration: line-through; color: var(--color-muted); }
-    .empty { color: var(--color-muted); }
+    /* ===== 设计 token：与 MAC-26 设计说明的 token 表同名同值 ===== */
+    :root {
+      /* 颜色 */
+      --color-primary: #2563eb;
+      --color-primary-hover: #1d4ed8;
+      --color-accent: #7c3aed;
+      --color-text: #111827;
+      --color-muted: #6b7280;
+      --color-border: #e5e7eb;
+      --color-bg: #ffffff;
+      --color-surface: #f9fafb;
+      --color-success: #047857;
+      --color-warning: #b45309;
+      --color-danger: #b91c1c;
+      --color-danger-bg: #fef2f2;
+      --color-chip-bg: #eef2ff;
+      --color-chip-text: #3730a3;
+      --color-chip-border: #c7d2fe;
+      --color-chip-bg-active: #3730a3;
+      --color-chip-text-active: #ffffff;
+      --color-focus: #1d4ed8;
+      /* 字号 */
+      --font-size-sm: 13px;
+      --font-size-body: 16px;
+      --font-size-lg: 20px;
+      --font-size-title: 28px;
+      /* 间距（4px 基准） */
+      --space-1: 4px;
+      --space-2: 8px;
+      --space-3: 12px;
+      --space-4: 16px;
+      --space-6: 24px;
+      --space-8: 32px;
+      /* 圆角 */
+      --radius-sm: 4px;
+      --radius: 8px;
+      --radius-pill: 999px;
+    }
+
+    body { margin: 0; background: var(--color-surface); font: var(--font-size-body)/1.5 system-ui, sans-serif; color: var(--color-text); }
+    .app { background: var(--color-bg); padding: var(--space-4); max-width: 640px; }
+    .app h1 { font-size: var(--font-size-title); margin: 0 0 var(--space-4); }
+
+    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+
+    /* 新增表单 */
+    .add-form { display: flex; gap: var(--space-2); margin-bottom: var(--space-2); align-items: flex-start; flex-wrap: wrap; }
+    .add-form .field { flex: 1 1 180px; display: flex; flex-direction: column; gap: var(--space-1); }
+    input[type="text"] { width: 100%; box-sizing: border-box; font: inherit; padding: var(--space-2); border: 1px solid var(--color-border); border-radius: var(--radius); background: var(--color-bg); color: var(--color-text); }
+    input[type="text"]::placeholder { color: var(--color-muted); }
+    input[type="text"][aria-invalid="true"] { border-color: var(--color-danger); }
+    .hint { font-size: var(--font-size-sm); color: var(--color-muted); }
+    button { font: inherit; padding: var(--space-2) var(--space-4); border: 0; border-radius: var(--radius); background: var(--color-primary); color: #fff; cursor: pointer; }
+    button:hover:not(:disabled) { background: var(--color-primary-hover); }
+    button:disabled { opacity: .6; cursor: progress; }
+    .btn-ghost { background: transparent; color: var(--color-primary); border: 1px solid var(--color-border); padding: var(--space-1) var(--space-2); font-size: var(--font-size-sm); }
+    .btn-ghost:hover:not(:disabled) { background: var(--color-surface); color: var(--color-primary-hover); }
+    :focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+
+    /* 错误 */
+    .form-error, .field-error { color: var(--color-danger); background: var(--color-danger-bg); border: 1px solid var(--color-danger); border-radius: var(--radius); padding: var(--space-2); margin: 0 0 var(--space-3); font-size: var(--font-size-sm); }
+    .load-error { color: var(--color-danger); background: var(--color-danger-bg); border: 1px solid var(--color-danger); border-radius: var(--radius); padding: var(--space-4); display: flex; gap: var(--space-3); align-items: center; justify-content: space-between; flex-wrap: wrap; }
+
+    /* 筛选条 */
+    .filter-bar { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; padding: var(--space-3) 0; border-top: 1px solid var(--color-border); }
+    .filter-label { font-size: var(--font-size-sm); color: var(--color-muted); }
+
+    /* chip：条目标签与筛选项共用一套视觉，只靠 aria-pressed 区分 */
+    .chip { display: inline-block; font-size: var(--font-size-sm); line-height: 1.6; padding: 0 var(--space-2); border-radius: var(--radius-pill); background: var(--color-chip-bg); color: var(--color-chip-text); border: 1px solid var(--color-chip-border); cursor: pointer; max-width: 12em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: middle; }
+    .chip:hover { background: var(--color-chip-border); color: var(--color-chip-text); }
+    .chip[aria-pressed="true"] { background: var(--color-chip-bg-active); color: var(--color-chip-text-active); border-color: var(--color-chip-bg-active); }
+
+    /* 列表 */
+    .todo-list { list-style: none; padding: 0; margin: 0; }
+    .todo-item { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2) 0; border-bottom: 1px solid var(--color-border); flex-wrap: wrap; }
+    .todo-check { width: 18px; height: 18px; flex: none; }
+    .todo-title { flex: 1 1 40%; min-width: 8em; cursor: pointer; }
+    .todo-item.done .todo-title { text-decoration: line-through; color: var(--color-muted); }
+    .tag-list { list-style: none; display: flex; gap: var(--space-1); padding: 0; margin: 0; flex-wrap: wrap; }
+    .todo-edit { flex: none; margin-left: auto; }
+
+    /* 行内编辑态 */
+    .todo-item--editing { align-items: stretch; background: var(--color-surface); border-radius: var(--radius); padding: var(--space-3); }
+    .edit-form { display: flex; flex-direction: column; gap: var(--space-2); width: 100%; }
+    .edit-form .field { display: flex; flex-direction: column; gap: var(--space-1); }
+    .edit-form label { font-size: var(--font-size-sm); color: var(--color-muted); }
+    .edit-actions { display: flex; gap: var(--space-2); }
+
+    /* 空态 */
+    .empty { color: var(--color-muted); padding: var(--space-6) 0; margin: 0; text-align: center; }
+    .empty .empty-title { display: block; font-size: var(--font-size-lg); color: var(--color-text); margin-bottom: var(--space-1); }
+
+    /* 加载态骨架 */
+    .skeleton-item { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2) 0; border-bottom: 1px solid var(--color-border); }
+    .skeleton-bar { height: 16px; border-radius: var(--radius-sm); background: var(--color-border); animation: sk 1.2s ease-in-out infinite; }
+    @keyframes sk { 0%, 100% { opacity: .5 } 50% { opacity: 1 } }
+    .loading-text { color: var(--color-muted); font-size: var(--font-size-sm); padding-top: var(--space-2); }
+
+    /* 响应式：<768 移动端。只用 order 视觉重排，DOM 顺序不变 */
+    @media (max-width: 767px) {
+      .app { padding: var(--space-3); }
+      .app h1 { font-size: var(--font-size-lg); }
+      .add-form { flex-direction: column; align-items: stretch; }
+      /* 纵向堆叠后 flex-basis 作用在高度上，需退回内容高度，否则每个输入会被撑到 180px */
+      .add-form .field { flex: 0 0 auto; }
+      .add-form button[type="submit"] { width: 100%; }
+      .todo-title { flex-basis: 100%; order: 2; }
+      .tag-list { order: 3; flex-basis: 100%; padding-left: 26px; }
+      .todo-edit { order: 1; }
+    }
   </style>
 </head>
 <body>
-  <h1>待办</h1>
-  <form id="add">
-    <input id="title" placeholder="要做什么？" required />
-    <button type="submit">添加</button>
-  </form>
-  <ul id="list"></ul>
-  <p id="empty" class="empty" hidden>还没有待办，添加一条吧。</p>
+  <main class="app">
+    <h1>待办</h1>
+    <form class="add-form" id="add-form">
+      <div class="field">
+        <label class="sr-only" for="title">标题</label>
+        <input type="text" id="title" placeholder="要做什么？" required />
+      </div>
+      <div class="field">
+        <label class="sr-only" for="tags">标签</label>
+        <input type="text" id="tags" placeholder="标签，逗号分隔（可留空）" aria-describedby="tags-hint" />
+        <span class="hint" id="tags-hint">用英文逗号分隔，最多 10 个，每个 1–20 字符</span>
+      </div>
+      <button type="submit" id="add-submit">添加</button>
+    </form>
+    <div id="form-error-slot"></div>
+    <div id="region"></div>
+  </main>
+
   <script>
-    // 最小前端：拉取列表、新增、切换完成
-    const list = document.getElementById("list");
-    const empty = document.getElementById("empty");
-    async function load() {
-      const { todos } = await (await fetch("/api/todos")).json();
-      list.innerHTML = "";
-      empty.hidden = todos.length > 0;
-      for (const t of todos) {
-        const li = document.createElement("li");
-        li.className = t.done ? "done" : "";
-        const cb = document.createElement("input");
-        cb.type = "checkbox";
-        cb.checked = t.done;
-        cb.addEventListener("change", async () => {
-          await fetch(`/api/todos/${t.id}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ done: cb.checked }) });
-          load();
+    // 前端：标签的输入、展示、筛选与行内编辑。
+    // 契约见 MAC-27（接口契约 / 标签规范化 / 前端请求序列），文案与结构见 MAC-26 设计说明。
+
+    // ===== 标签规范化：与服务端 normalizeTags 同一套规则（MAC-27 冻结） =====
+    // 唯一的标签比较键。去重、筛选条聚合共用这一个定义。
+    const tagKey = (s) => s.trim().toLowerCase();
+
+    // 规范化 + 校验：成功返回 { tags }，失败返回 { error }（错误文案取设计说明「表单校验规则」表）。
+    function normalizeTags(input) {
+      if (!Array.isArray(input)) return { error: "标签格式不正确，请重新输入。" };
+      const out = [];
+      const seen = new Set();
+      for (const raw of input) {
+        if (typeof raw !== "string") return { error: "标签格式不正确，请重新输入。" };
+        const t = raw.trim();                                     // ① 去首尾空白
+        if (!t) continue;                                         // ② 空白项静默丢弃
+        if (t.includes(",")) return { error: "标签不能包含英文逗号，逗号只用于分隔标签。" }; // ③
+        if ([...t].length > 20) return { error: `标签「${t}」超过 20 个字符，请改短后再提交。` }; // ④ 按码点计
+        const k = tagKey(t);
+        if (seen.has(k)) continue;                                // ⑤ 大小写不敏感去重，
+        seen.add(k);                                              //    保留首次出现的原样写法
+        out.push(t);
+      }
+      if (out.length > 10) {                                      // ⑥ 去重之后才计数
+        return { error: `最多只能设置 10 个标签，当前 ${out.length} 个，请删掉 ${out.length - 10} 个。` };
+      }
+      return { tags: out };
+    }
+
+    // 输入框文本 → 标签数组：英文逗号分隔（Q4，标签内不可含逗号，无法转义）
+    const parseTagsInput = (text) => (text.includes(",") ? text.split(",") : text.trim() ? [text] : []);
+
+    // ===== 类型守卫：网络 JSON 先过守卫再用 =====
+    function toTodo(v) {
+      if (!v || typeof v !== "object") return null;
+      if (typeof v.id !== "number" || typeof v.title !== "string" || typeof v.done !== "boolean") return null;
+      // tags 按契约恒存在；老服务端不带该字段时按无标签处理，页面不因此报错
+      const tags = Array.isArray(v.tags) ? v.tags.filter((t) => typeof t === "string") : [];
+      return { id: v.id, title: v.title, done: v.done, tags };
+    }
+    function toTodoList(v) {
+      if (!v || typeof v !== "object" || !Array.isArray(v.todos)) throw new Error("bad payload");
+      return v.todos.map(toTodo).filter(Boolean);
+    }
+
+    // ===== 状态 =====
+    const state = {
+      all: [],            // 最近一次不带 tag 的全量结果：筛选条 chip 集合只来自这里
+      list: null,         // 当前列表；null 表示还没有可展示的数据（走加载骨架）
+      activeTag: null,    // 选中的筛选标签；null = 「全部」
+      editingId: null,    // 同一时刻只有一条处于编辑态
+      editDraft: null,    // 编辑态输入的即时值，重绘不丢
+      editError: "",
+      editSubmitting: false,
+      loadError: false,
+      submitting: false,
+      formError: "",
+      formInvalidField: null // "title" | "tags" | null
+    };
+    let pendingFocus = null; // 本次渲染后要聚焦的元素选择器/回调
+
+    const region = document.getElementById("region");
+    const formErrorSlot = document.getElementById("form-error-slot");
+    const titleInput = document.getElementById("title");
+    const tagsInput = document.getElementById("tags");
+    const addSubmit = document.getElementById("add-submit");
+
+    // ===== 请求 =====
+    async function fetchTodos(tag) {
+      const url = tag ? `/api/todos?tag=${encodeURIComponent(tag)}` : "/api/todos";
+      const res = await fetch(url);
+      if (!res.ok) throw new Error("http " + res.status);
+      return toTodoList(await res.json());
+    }
+
+    // 前端请求序列（MAC-27）：全量结果渲染筛选条；有筛选时列表另取 ?tag=X
+    async function refresh({ skeleton = false } = {}) {
+      if (skeleton) state.list = null;
+      state.loadError = false;
+      render();
+      try {
+        const all = await fetchTodos(null);
+        state.all = all;
+        state.list = state.activeTag ? await fetchTodos(state.activeTag) : all;
+      } catch {
+        state.loadError = true;
+        state.list = null;
+      }
+      render();
+    }
+
+    // 点 chip 只拉列表，chip 集合沿用最近一次全量结果；点「全部」两者一起刷新
+    async function applyFilter(tag) {
+      state.activeTag = tag;
+      state.editingId = null;
+      state.editError = "";
+      state.list = null;
+      state.loadError = false;
+      state.formError = "";
+      state.formInvalidField = null;
+      render();
+      try {
+        if (tag === null) {
+          const all = await fetchTodos(null);
+          state.all = all;
+          state.list = all;
+        } else {
+          state.list = await fetchTodos(tag);
+        }
+      } catch {
+        state.loadError = true;
+      }
+      render();
+    }
+
+    // ===== 渲染 =====
+    const el = (tag, props = {}, children = []) => {
+      const node = document.createElement(tag);
+      for (const [k, v] of Object.entries(props)) {
+        if (k === "class") node.className = v;
+        else if (k === "text") node.textContent = v; // 用户输入一律走 textContent
+        else if (k === "on") for (const [ev, fn] of Object.entries(v)) node.addEventListener(ev, fn);
+        else if (v !== null && v !== false) node.setAttribute(k, v === true ? "" : v);
+      }
+      for (const c of [].concat(children)) if (c) node.append(c);
+      return node;
+    };
+
+    // 筛选条候选标签：全量结果里用过的标签，tagKey 去重、保留首次原样、按首次出现顺序
+    function collectTags() {
+      const out = [];
+      const seen = new Set();
+      for (const t of state.all) {
+        for (const tag of t.tags) {
+          const k = tagKey(tag);
+          if (seen.has(k)) continue;
+          seen.add(k);
+          out.push(tag);
+        }
+      }
+      return out;
+    }
+
+    function chipButton(text, { pressed = null, title = null, onClick }) {
+      return el("button", {
+        type: "button", class: "chip", text,
+        "aria-pressed": pressed === null ? null : String(pressed),
+        title,
+        on: { click: onClick }
+      });
+    }
+
+    function renderFilterBar() {
+      if (!state.all.length) return null; // 一条待办都没有时整条不渲染
+      const tags = collectTags();
+      // 选中的标签可能已不再被任何待办使用（筛选零命中），仍要保留其选中态
+      if (state.activeTag && !tags.some((t) => tagKey(t) === tagKey(state.activeTag))) tags.push(state.activeTag);
+      if (!tags.length) return null; // 有待办但都无标签：只剩「全部」，无可筛内容
+      const bar = el("nav", { class: "filter-bar", "aria-label": "按标签筛选" }, [
+        el("span", { class: "filter-label", text: "筛选" }),
+        chipButton("全部", { pressed: state.activeTag === null, onClick: () => applyFilter(null) })
+      ]);
+      for (const t of tags) {
+        bar.append(chipButton(t, {
+          pressed: state.activeTag !== null && tagKey(t) === tagKey(state.activeTag),
+          onClick: () => applyFilter(t)
+        }));
+      }
+      return bar;
+    }
+
+    function renderSkeleton() {
+      const ul = el("ul", { class: "todo-list", "aria-busy": "true" });
+      for (const w of [60, 40, 50]) {
+        ul.append(el("li", { class: "skeleton-item" }, [
+          el("span", { class: "skeleton-bar", style: "width:18px" }),
+          el("span", { class: "skeleton-bar", style: `width:${w}%` })
+        ]));
+      }
+      const wrap = document.createDocumentFragment();
+      wrap.append(ul, el("p", { class: "loading-text", role: "status", text: "加载中…" }));
+      return wrap;
+    }
+
+    function renderEmpty(titleText, hintText) {
+      return el("p", { class: "empty" }, [el("span", { class: "empty-title", text: titleText }), document.createTextNode(hintText)]);
+    }
+
+    function renderLoadError() {
+      return el("div", { class: "load-error", role: "alert" }, [
+        el("span", { text: "待办加载失败，请检查服务是否已启动。" }),
+        el("button", { type: "button", text: "重试", on: { click: () => refresh({ skeleton: true }) } })
+      ]);
+    }
+
+    async function toggleDone(todo, checkbox) {
+      const desired = checkbox.checked;
+      state.formError = "";
+      state.formInvalidField = null;
+      try {
+        // 勾选完成只发 done，不带 tags（AC13）
+        const res = await fetch(`/api/todos/${todo.id}`, {
+          method: "PATCH",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ done: desired })
         });
-        const span = document.createElement("span");
-        span.textContent = t.title;
-        li.append(cb, span);
-        list.append(li);
+        if (!res.ok) throw new Error("http " + res.status);
+        await refresh();
+      } catch {
+        state.formError = "保存失败，请稍后重试。";
+        render(); // 重绘即回到服务端已知状态，勾选框自动还原
       }
     }
-    document.getElementById("add").addEventListener("submit", async (e) => {
+
+    function renderItem(todo) {
+      const li = el("li", { class: "todo-item" + (todo.done ? " done" : "") });
+      const cbId = `cb-${todo.id}`;
+      const cb = el("input", { type: "checkbox", class: "todo-check", id: cbId, checked: todo.done });
+      cb.addEventListener("change", () => toggleDone(todo, cb));
+      li.append(cb, el("label", { class: "todo-title", for: cbId, text: todo.title }));
+
+      // 无标签的条目不渲染 ul.tag-list 元素本身（AC3、AC7）
+      if (todo.tags.length) {
+        const ul = el("ul", { class: "tag-list" });
+        for (const t of todo.tags) {
+          ul.append(el("li", {}, [chipButton(t, { title: `按「${t}」筛选`, onClick: () => applyFilter(t) })]));
+        }
+        li.append(ul);
+      }
+
+      li.append(el("button", {
+        type: "button", class: "btn-ghost todo-edit", text: "编辑",
+        "aria-label": `编辑「${todo.title}」`,
+        "data-edit-for": String(todo.id),
+        on: { click: () => startEdit(todo) }
+      }));
+      return li;
+    }
+
+    function startEdit(todo) {
+      state.editingId = todo.id;
+      state.editDraft = { title: todo.title, tags: todo.tags.join(", ") };
+      state.editError = "";
+      state.editSubmitting = false;
+      pendingFocus = "#edit-title";
+      render();
+    }
+
+    function cancelEdit(todoId) {
+      state.editingId = null;
+      state.editDraft = null;
+      state.editError = "";
+      // 焦点还给触发编辑的那个「编辑」按钮
+      pendingFocus = `[data-edit-for="${todoId}"]`;
+      render();
+    }
+
+    async function saveEdit(todo) {
+      const title = state.editDraft.title.trim();
+      if (!title) {
+        state.editError = "标题不能为空。";
+        pendingFocus = "#edit-title";
+        return render();
+      }
+      const normalized = normalizeTags(parseTagsInput(state.editDraft.tags));
+      if (normalized.error) {
+        state.editError = normalized.error;
+        pendingFocus = "#edit-tags";
+        return render();
+      }
+      state.editError = "";
+      state.editSubmitting = true;
+      render();
+      try {
+        // tags 整体替换；清空输入即清空全部标签（AC4、AC5）
+        const res = await fetch(`/api/todos/${todo.id}`, {
+          method: "PATCH",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ title, tags: normalized.tags })
+        });
+        if (!res.ok) throw new Error("http " + res.status);
+        state.editingId = null;
+        state.editDraft = null;
+        state.editSubmitting = false;
+        await refresh();
+      } catch {
+        state.editSubmitting = false;
+        state.editError = "保存失败，请稍后重试。";
+        render();
+      }
+    }
+
+    function renderEditItem(todo) {
+      const form = el("form", { class: "edit-form" });
+      if (state.editError) form.append(el("p", { class: "field-error", role: "alert", text: state.editError }));
+
+      const tInput = el("input", { type: "text", id: "edit-title", value: state.editDraft.title });
+      tInput.addEventListener("input", () => { state.editDraft.title = tInput.value; });
+      form.append(el("div", { class: "field" }, [el("label", { for: "edit-title", text: "标题" }), tInput]));
+
+      const gInput = el("input", {
+        type: "text", id: "edit-tags", value: state.editDraft.tags,
+        "aria-describedby": "edit-tags-hint",
+        "aria-invalid": state.editError ? "true" : null
+      });
+      gInput.addEventListener("input", () => { state.editDraft.tags = gInput.value; });
+      form.append(el("div", { class: "field" }, [
+        el("label", { for: "edit-tags", text: "标签（英文逗号分隔，留空表示无标签）" }),
+        gInput,
+        el("span", { class: "hint", id: "edit-tags-hint", text: "最多 10 个标签，每个 1–20 字符；大小写不敏感、自动去重" })
+      ]));
+
+      form.append(el("div", { class: "edit-actions" }, [
+        el("button", { type: "submit", text: state.editSubmitting ? "保存中…" : "保存", disabled: state.editSubmitting }),
+        el("button", { type: "button", class: "btn-ghost", text: "取消", on: { click: () => cancelEdit(todo.id) } })
+      ]));
+
+      form.addEventListener("submit", (e) => { e.preventDefault(); if (!state.editSubmitting) saveEdit(todo); });
+      form.addEventListener("keydown", (e) => { if (e.key === "Escape") { e.preventDefault(); cancelEdit(todo.id); } });
+      return el("li", { class: "todo-item todo-item--editing" }, [form]);
+    }
+
+    function renderList() {
+      if (state.loadError) return renderLoadError();
+      if (state.list === null) return renderSkeleton();
+      if (state.list.length === 0) {
+        return state.activeTag
+          ? renderEmpty(`没有带「${state.activeTag}」标签的待办`, "换一个标签，或点「全部」查看所有待办。")
+          : renderEmpty("还没有待办", "在上面输入标题，顺手打个标签，添加第一条吧。");
+      }
+      const ul = el("ul", { class: "todo-list" });
+      for (const t of state.list) ul.append(t.id === state.editingId ? renderEditItem(t) : renderItem(t));
+      return ul;
+    }
+
+    function render() {
+      // 新增表单是常驻 DOM，只同步按钮与错误状态，避免重绘吞掉用户正在输入的内容
+      addSubmit.disabled = state.submitting;
+      addSubmit.textContent = state.submitting ? "添加中…" : "添加";
+      titleInput.setAttribute("aria-invalid", String(state.formInvalidField === "title"));
+      tagsInput.setAttribute("aria-invalid", String(state.formInvalidField === "tags"));
+      formErrorSlot.replaceChildren();
+      if (state.formError) formErrorSlot.append(el("p", { class: "form-error", role: "alert", text: state.formError }));
+
+      region.replaceChildren();
+      const bar = state.loadError ? null : renderFilterBar(); // 加载失败时不渲染筛选条
+      if (bar) region.append(bar);
+      region.append(renderList());
+
+      if (pendingFocus) {
+        const target = document.querySelector(pendingFocus);
+        pendingFocus = null;
+        if (target) target.focus();
+      }
+    }
+
+    // ===== 新增 =====
+    document.getElementById("add-form").addEventListener("submit", async (e) => {
       e.preventDefault();
-      const input = document.getElementById("title");
-      await fetch("/api/todos", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ title: input.value }) });
-      input.value = "";
-      load();
+      if (state.submitting) return;
+      const title = titleInput.value.trim();
+      if (!title) {
+        state.formError = "标题不能为空。";
+        state.formInvalidField = "title";
+        render();
+        return titleInput.focus();
+      }
+      const normalized = normalizeTags(parseTagsInput(tagsInput.value));
+      if (normalized.error) {
+        state.formError = normalized.error;
+        state.formInvalidField = "tags";
+        render();
+        return tagsInput.focus();
+      }
+      state.formError = "";
+      state.formInvalidField = null;
+      state.submitting = true;
+      render();
+      try {
+        const res = await fetch("/api/todos", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ title, tags: normalized.tags })
+        });
+        if (!res.ok) throw new Error("http " + res.status);
+        titleInput.value = "";
+        tagsInput.value = "";
+        state.submitting = false;
+        await refresh();
+      } catch {
+        // 失败时保留用户已输入内容
+        state.submitting = false;
+        state.formError = "添加失败，请稍后重试。";
+        render();
+      }
     });
-    load();
+
+    refresh({ skeleton: true });
   </script>
 </body>
 </html>
