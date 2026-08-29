@@ -246,3 +246,81 @@ test("非法标签：PATCH 返回 400 时 done / title / tags 一个都没被改
     assert.deepEqual(todos[0], { id: todo.id, title: "原标题", done: false, tags: ["工作"] });
   });
 });
+
+// ---- 以下为 MAC-28 补充：测试工程师按 AC 追加的用例 ----
+
+// TC3 补（AC4）：整体替换标签时，id / title / done 必须不变，且列表侧同步
+test("编辑标签：整体替换时 id / title / done 不变且列表同步", async () => {
+  await withApp(async (url) => {
+    const todo = await (await post(url, { title: "买菜", tags: ["工作"] })).json();
+    const res = await patch(url, todo.id, { tags: ["生活", "购物"] });
+    assert.equal(res.status, 200);
+    const patched = await res.json();
+    assert.deepEqual(patched, { id: todo.id, title: "买菜", done: false, tags: ["生活", "购物"] });
+    assert.ok(!patched.tags.includes("工作"));
+
+    const { todos } = await list(url);
+    assert.deepEqual(todos, [{ id: todo.id, title: "买菜", done: false, tags: ["生活", "购物"] }]);
+  });
+});
+
+// TC8（AC12）：老客户端全流程「创建 → 列出 → 标记完成」，原有三字段的名称/类型/取值不变
+test("向后兼容：老客户端创建 → 列出 → 标记完成 全流程字段一致", async () => {
+  await withApp(async (url) => {
+    const created = await (await post(url, { title: "老客户端" })).json();
+    assert.equal(typeof created.id, "number");
+    assert.equal(typeof created.title, "string");
+    assert.equal(typeof created.done, "boolean");
+    assert.equal(created.id, 1);
+    assert.equal(created.title, "老客户端");
+    assert.equal(created.done, false);
+
+    const { todos } = await list(url);
+    assert.equal(todos.length, 1);
+    assert.deepEqual(Object.keys(todos[0]).sort(), ["done", "id", "tags", "title"]);
+    assert.equal(todos[0].id, created.id);
+    assert.equal(todos[0].title, "老客户端");
+    assert.equal(todos[0].done, false);
+
+    const res = await patch(url, created.id, { done: true });
+    assert.equal(res.status, 200);
+    const done = await res.json();
+    assert.equal(done.id, created.id);
+    assert.equal(done.title, "老客户端");
+    assert.equal(done.done, true);
+  });
+});
+
+// TC12 补（AC16）：POST 非法 tags 返回 400 后，列表中不得产生该待办、id 不被消耗
+test("非法标签：POST 400 后列表中不产生该待办", async () => {
+  await withApp(async (url) => {
+    const bad = [
+      { title: "脏数据", tags: "工作" },
+      { title: "脏数据", tags: null },
+      { title: "脏数据", tags: ["工作", 1] },
+      { title: "脏数据", tags: ["a,b"] },
+      { title: "脏数据", tags: ["一".repeat(21)] },
+      { title: "脏数据", tags: Array.from({ length: 11 }, (_, i) => `标签${i}`) },
+    ];
+    for (const body of bad) {
+      assert.equal((await post(url, body)).status, 400, JSON.stringify(body));
+      assert.deepEqual((await list(url)).todos, [], JSON.stringify(body));
+    }
+    // 前面的 400 不应消耗自增 id
+    const ok = await (await post(url, { title: "正常" })).json();
+    assert.equal(ok.id, 1);
+  });
+});
+
+// TC14（AC16 / 契约三态表）：PATCH tags 为 null 是 400，不是「清空」
+test("非法标签：PATCH tags 为 null 返回 400 且待办未被修改", async () => {
+  await withApp(async (url) => {
+    const todo = await (await post(url, { title: "写周报", tags: ["工作"] })).json();
+    const res = await patch(url, todo.id, { tags: null });
+    assert.equal(res.status, 400);
+    assert.deepEqual(await res.json(), { error: "tags 必须是字符串数组" });
+
+    const { todos } = await list(url);
+    assert.deepEqual(todos[0], { id: todo.id, title: "写周报", done: false, tags: ["工作"] });
+  });
+});
